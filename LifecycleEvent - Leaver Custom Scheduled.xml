@@ -1,0 +1,66 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE Rule PUBLIC "sailpoint.dtd" "sailpoint.dtd">
+<Rule created="1594398118127" id="ff8080817338ac1d0173398890ef0077" language="beanshell" modified="1595016803997" name="LifecycleEvent - Leaver Custom Scheduled" type="IdentityTrigger">
+  <Description>This rule can be used for Certification Events that use rule triggers. The previousIdentity and newIdentity hold snapshots of the identity before the update has occurred and the state of the identity after the update, respectively.</Description>
+  <Signature returnType="boolean">
+    <Inputs>
+      <Argument name="log">
+        <Description>
+          The log object associated with the SailPointContext.
+        </Description>
+      </Argument>
+      <Argument name="context">
+        <Description>
+          A sailpoint.api.SailPointContext object that can be used to query the database if necessary.
+        </Description>
+      </Argument>
+      <Argument name="previousIdentity">
+        <Description>
+          The identity before the refresh/aggregation (this will be null when an
+          identity is created).
+        </Description>
+      </Argument>
+      <Argument name="newIdentity">
+        <Description>
+          The identity after the refresh/aggregation (this will be null when an
+          identity is deleted).
+        </Description>
+      </Argument>
+    </Inputs>
+    <Returns>
+      <Argument name="result">
+        <Description>
+          A boolean describing the result of the rule.
+        </Description>
+      </Argument>
+    </Returns>
+  </Signature>
+  <Source>
+Date leaverdate = null;
+String LeaverDateValue=newIdentity.getAttribute("leaverDate");
+String leaverProcessedDateValue=newIdentity.getAttribute("leaverProcessedDate");
+
+if(LeaverDateValue!=null &amp;&amp; leaverProcessedDateValue==null )
+{
+  DateFormat formatter = new SimpleDateFormat("d/m/yy");
+  try {
+    leaverdate=formatter.parse(LeaverDateValue);
+  } catch (Exception ex) {
+     log.error(ex.getStackTrace());
+     return false;
+  }
+  DateFormat dateFormat = new SimpleDateFormat("d/m/yy");
+  Calendar TodayCal = Calendar.getInstance();
+  Date todayDate = TodayCal.getTime();
+  TodayCal.set(Calendar.HOUR_OF_DAY, 17);
+  Date timetoFive =  TodayCal.getTime();
+        
+
+  if (todayDate.compareTo(leaverdate) == 0 &amp;&amp; timetoFive.compareTo(todayDate) >0) {
+      return true;
+  } else if (todayDate.compareTo(leaverdate) > 0) {
+      return true;
+  }
+}
+return false;</Source>
+</Rule>

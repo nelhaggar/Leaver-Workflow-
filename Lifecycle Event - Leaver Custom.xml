@@ -1,0 +1,231 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE Workflow PUBLIC "sailpoint.dtd" "sailpoint.dtd">
+<Workflow created="1594323434255" explicitTransitions="true" id="ff8080817333dc3c01733514fb0f00c9" libraries="Identity" modified="1594821288729" name="Lifecycle Event - Leaver Custom" type="IdentityLifecycle">
+  <Variable input="true" name="trigger">
+    <Description>The IdentityTrigger</Description>
+  </Variable>
+  <Variable input="true" name="event" transient="true">
+    <Description>The IdentityChangeEvent.  It can be used to build
+      the provisioning plan, but does not need to be
+      persisted with the case, so marked as transient.</Description>
+  </Variable>
+  <Variable input="true" name="identityName">
+    <Description>The name of the identity.</Description>
+  </Variable>
+  <Variable initializer="script:(identityDisplayName != void) ? identityDisplayName : resolveDisplayName(identityName)" input="true" name="identityDisplayName">
+    <Description>The displayName of the identity being updated.
+      Query for this using a projection query and fall back to the name.</Description>
+  </Variable>
+  <Variable name="plan">
+    <Description>The provisioning plan, which is built by a service method.</Description>
+  </Variable>
+  <Variable editable="true" initializer="true" name="optimisticProvisioning">
+    <Description>Set to true to enable optimistic provisioning.  This will cause
+      changes to the entitlements compiled from role assignments to be
+      applied immediately to the identity cube rather than waiting
+      for the next refresh/reaggregation after the provisioning system
+      completes the request.</Description>
+  </Variable>
+  <Variable editable="true" initializer="true" name="foregroundProvisioning">
+    <Description>Normally provisioning is done in a step that uses the &amp;quot;background&amp;quot;
+      option to force the workflow to be suspend and be resumed in a
+      background task thread.  This prevents the browser session from
+      hanging since provision can sometimes take a long time.  For demos
+      and testing it can be better to do this in the foreground so that
+      provisioning will have been performed when control is returned to the
+      user.  This prevents having to run the Perform Maintenance task to
+      see the results of the request.</Description>
+  </Variable>
+  <Variable initializer="spadmin" input="true" name="fallbackApprover">
+    <Description>A String that specifies the name of the Identity that will
+      be assigned any approvals where the owner of the approver
+      can&amp;#39;t be resolved. Example if the scheme is &amp;quot;owner&amp;quot; and the
+      application doesn&amp;#39;t specify and owner.</Description>
+  </Variable>
+  <Variable initializer="LCM" input="true" name="source">
+    <Description>String version of sailpoint.object.Source to indicate
+      where the request originated.  Defaults to LCM.</Description>
+  </Variable>
+  <Variable initializer="true" input="true" name="trace">
+    <Description>Used for debugging this workflow and when set to true trace
+      will be sent to stdout.</Description>
+  </Variable>
+  <Variable name="project">
+    <Description>ProvisioningProject which is just a compiled version of the ProvisioningPlan.</Description>
+  </Variable>
+  <Variable name="identityRequestId" output="true">
+    <Description>The sequence id of the Identity request object which is stored in
+      the name field of the identity request.</Description>
+  </Variable>
+  <Variable name="cart" output="true">
+    <Description>This variable includes all ApprovalItems that are part of
+      the request process and is updated during the AfterScript
+      of the approval process by assimilating the decisions
+      and comments from the Approvals copy of the ApprovalItem.</Description>
+  </Variable>
+  <Variable initializer="Normal" input="true" name="workItemPriority">
+    <Description>The String version of a WorkItem.Priority. This variable is
+      used to set the priority on all of the workitems generated
+      as part of this workflow and also set on the IdentityRequest
+      object.</Description>
+  </Variable>
+  <Description>Disable all accounts when an employee leaves the company.</Description>
+  <RuleLibraries>
+    <Reference class="sailpoint.object.Rule" id="ff808081618fc50001618fc52fb00191" name="LCM Workflow Library"/>
+  </RuleLibraries>
+  <Step icon="Start" name="Start" posX="60" posY="148">
+    <Transition to="Send Application Owner Notification"/>
+  </Step>
+  <Step action="sendEmail" icon="Email" name="Send Application Owner Notification" posX="115" posY="38">
+    <Arg name="template" value="Leaver Notification - App Owners"/>
+    <Arg name="to" value="appOwners@demo.com"/>
+    <Arg name="cc">
+      <Script>
+        <Source>import sailpoint.object.Identity;
+          Identity identity=context.getObjectByName(Identity.class, identityName);
+          String CC="helpdesk@demo.com,"+getManagersEmail(identityName);
+          if(identity!=null)
+          {
+          System.out.println("identity="+identity.toXml());
+          if(identity.isCorrelated())
+          {
+          return CC+",HR@demo.com";
+          }
+          else
+          {
+          return CC;
+          }
+          }
+        </Source>
+      </Script>
+    </Arg>
+    <Arg name="identityObject">
+      <Script>
+        <Source>import sailpoint.object.Identity;
+          Identity identityObject=context.getObjectByName(Identity.class, identityName);
+          if(identityObject!=null)
+          {
+          log.warn("IdenityObject="+identityObject.toXml());
+          System.out.println("IdenityObject="+identityObject.toXml());
+          return identityObject;
+          }
+          else
+          {
+          return null;
+          }
+        </Source>
+      </Script>
+    </Arg>
+    <Transition to="Build Provisioning Plan"/>
+  </Step>
+  <Step action="call:buildEventPlan" icon="Default" name="Build Provisioning Plan" posX="284" posY="39" resultVariable="plan">
+    <Arg name="trigger" value="ref:trigger"/>
+    <Arg name="op" value="Disable"/>
+    <Arg name="event" value="ref:event"/>
+    <Arg name="identityName" value="ref:identityName"/>
+    <Description>Go through all of the user's links and build a plan.</Description>
+    <Transition to="Modify Provisioning Plan"/>
+  </Step>
+  <Step action="rule:Remove_Authoritative_from_plan" icon="Default" name="Modify Provisioning Plan" posX="422" posY="41" resultVariable="plan">
+    <Transition to="Initialize"/>
+  </Step>
+  <Step icon="Task" name="Initialize" posX="554" posY="42">
+    <Arg name="identityRequestId"/>
+    <Arg name="allowRequestsWithViolations"/>
+    <Arg name="identityDisplayName" value="ref:identityDisplayName"/>
+    <Arg name="formTemplate" value="Identity Update"/>
+    <Arg name="flow" value="Lifecycle"/>
+    <Arg name="endOnManualWorkItems"/>
+    <Arg name="launcher" value="ref:launcher"/>
+    <Arg name="requireViolationReviewComments"/>
+    <Arg name="priority" value="ref:workItemPriority"/>
+    <Arg name="identityName" value="ref:identityName"/>
+    <Arg name="violationReviewDecision"/>
+    <Arg name="workItemComments"/>
+    <Arg name="policyViolations"/>
+    <Arg name="asyncCacheRefresh"/>
+    <Arg name="trace" value="ref:trace"/>
+    <Arg name="endOnProvisioningForms"/>
+    <Arg name="policyScheme" value="none"/>
+    <Arg name="project"/>
+    <Arg name="plan" value="ref:plan"/>
+    <Arg name="source" value="ref:source"/>
+    <Arg name="policiesToCheck"/>
+    <Arg name="approvalSet"/>
+    <Arg name="enableRetryRequest"/>
+    <Arg name="identityRequest"/>
+    <Arg name="optimisticProvisioning" value="ref:optimisticProvisioning"/>
+    <Description>
+      Call the standard subprocess to initialize the request, this includes
+      auditing, building the approvalset, compiling the plan into 
+       project and checking policy violations.
+    </Description>
+    <Return name="project" to="project"/>
+    <Return name="approvalSet" to="cart"/>
+    <Return name="identityRequestId" to="identityRequestId"/>
+    <Return name="policyViolations" to="policyViolations"/>
+    <WorkflowRef>
+      <Reference class="sailpoint.object.Workflow" id="ff80808161951f4e0161951f99130036" name="Identity Request Initialize"/>
+    </WorkflowRef>
+    <Transition to="Set Leaver Processed Date"/>
+  </Step>
+  <Step action="rule:SetLaverDateToday" icon="Default" name="Set Leaver Processed Date" posX="731" posY="42">
+    <Transition to="Audit Leaver Event"/>
+  </Step>
+  <Step action="rule:Audit_Leaver_Event" icon="Default" name="Audit Leaver Event" posX="879" posY="42">
+    <Transition to="Provision"/>
+  </Step>
+  <Step condition="script:!((size(policyViolations) > 0 ) &amp;&amp; (policyScheme.equals(&quot;fail&quot;)))" icon="Task" name="Provision" posX="880" posY="207">
+    <Arg name="workItemComments"/>
+    <Arg name="trace" value="ref:trace"/>
+    <Arg name="identityRequestId" value="ref:identityRequestId"/>
+    <Arg name="identityDisplayName" value="ref:identityDisplayName"/>
+    <Arg name="formTemplate" value="Identity Update"/>
+    <Arg name="manualActionsEmailTemplate" value="Pending Manual Changes"/>
+    <Arg name="policyScheme" value="none"/>
+    <Arg name="foregroundProvisioning" value="ref:foregroundProvisioning"/>
+    <Arg name="splitProvisioning"/>
+    <Arg name="project" value="ref:project"/>
+    <Arg name="launcher" value="ref:launcher"/>
+    <Arg name="plan"/>
+    <Arg name="priority" value="ref:workItemPriority"/>
+    <Arg name="approvalSet"/>
+    <Arg name="identityName" value="ref:identityName"/>
+    <Arg name="approvalScheme" value="ref:approvalScheme"/>
+    <Arg name="fallbackApprover" value="ref:fallbackApprover"/>
+    <Arg name="optimisticProvisioning" value="ref:optimisticProvisioning"/>
+    <Arg name="recompile"/>
+    <Description>
+      Call the standard subprocess that will process the
+      approval decisions and do provisioning.  This
+      includes calling any configured provisioning
+      connectors and building manual actions.
+    </Description>
+    <Return name="project" to="project"/>
+    <WorkflowRef>
+      <Reference class="sailpoint.object.Workflow" id="ff80808161951f4e0161951f99830039" name="Identity Request Provision"/>
+    </WorkflowRef>
+    <Transition to="Finalize"/>
+  </Step>
+  <Step catches="complete" condition="script:!((size(policyViolations) > 0 ) &amp;&amp; (policyScheme.equals(&quot;fail&quot;)))" icon="Task" name="Finalize" posX="652" posY="206">
+    <Arg name="autoVerifyIdentityRequest"/>
+    <Arg name="project" value="ref:project"/>
+    <Arg name="ticketDataGenerationRule"/>
+    <Arg name="priority" value="ref:workItemPriority"/>
+    <Arg name="trace" value="ref:trace"/>
+    <Arg name="identityRequestId" value="ref:identityRequestId"/>
+    <Arg name="approvalSet" value="ref:cart"/>
+    <Arg name="ticketManagementApplication"/>
+    <Description>
+      Call the standard subprocess that can audit/finalize the request.
+    </Description>
+    <WorkflowRef>
+      <Reference class="sailpoint.object.Workflow" id="ff80808161951f4e0161951f99a6003a" name="Identity Request Finalize"/>
+    </WorkflowRef>
+    <Transition to="Audit Leaver Complete"/>
+  </Step>
+  <Step action="rule:Audit_leaver_complete" icon="Default" name="Audit Leaver Complete" posX="530" posY="207">
+    <Transition to="end"/>
+  </Step>
+  <Step icon="Stop" name="end" posX="392" posY="207"/>
+</Workflow>

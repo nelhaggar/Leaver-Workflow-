@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE Rule PUBLIC "sailpoint.dtd" "sailpoint.dtd">
+<Rule created="1593967204089" id="ff808081731eefdd01731fd956f9006f" language="beanshell" modified="1595017135697" name="getEntitlments">
+  <Source>
+import sailpoint.object.*;
+import java.util.Iterator;
+import sailpoint.object.Identity;
+import sailpoint.object.QueryOptions;
+import sailpoint.object.Filter;
+import sailpoint.object.Application;  
+import sailpoint.object.Entitlement;
+
+List&lt;String> AllEntitlements = new ArrayList&lt;String>();
+// String app ="LDAP";
+ // String nativeId="Aaron.Nichols";
+public List entitlementsToRemove(String app, String nativeId)
+{
+ 
+ Filter filter1 = Filter.eq("application.name",app); 
+
+ Filter filter2 = Filter.eq("nativeIdentity", nativeId); 
+
+  
+  Filter filter = Filter.and(filter1, filter2); 
+  QueryOptions qo = new QueryOptions(); 
+  qo.addFilter(filter); 
+  Iterator it = context.search(IdentityEntitlement.class, qo); 
+
+	while (it.hasNext()) 
+  { 
+    
+	IdentityEntitlement idEntitlement = (IdentityEntitlement)it.next();    
+  AllEntitlements.add(idEntitlement.getStringValue()); 
+  
+  }
+
+sailpoint.tools.Util.flushIterator(it);
+  
+  return AllEntitlements;
+}
+  </Source>
+</Rule>

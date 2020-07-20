@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE Rule PUBLIC "sailpoint.dtd" "sailpoint.dtd">
+<Rule created="1594727926181" id="ff808081734cf4b101734d3109a50020" language="beanshell" modified="1595016903035" name="Remove_Authoritative_from_plan" type="Workflow">
+  <Description>A rule used by a Workflow to determine a step action or variable value.
+
+Note that an Attributes map of all variables from the current WorkflowContext, merged with the arguments from the Step, is also passed into the workflow rule.</Description>
+  <Signature returnType="Object"/>
+  <Source>import sailpoint.object.*;
+ 
+  List arRemoves = new ArrayList();
+  List accountRequests = plan.getAccountRequests();
+  
+if ( accountRequests != null )
+{
+    for ( AccountRequest accountRequest : accountRequests )
+      
+		{
+     
+      String App=accountRequest.getApplication();
+   
+      Application application = context.getObjectByName( Application.class, App);
+			
+   if(application.isAuthoritative())
+   {
+      arRemoves.add(accountRequest);	   
+   }
+
+    }
+      for (AccountRequest accountToRemove : arRemoves)
+      {
+	  		plan.remove(accountToRemove); 
+			}
+}
+return plan;</Source>
+</Rule>

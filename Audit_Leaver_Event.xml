@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE Rule PUBLIC "sailpoint.dtd" "sailpoint.dtd">
+<Rule created="1594646897773" id="ff8080817348516a0173485ca46d0107" language="beanshell" modified="1594821282250" name="Audit_Leaver_Event" type="Workflow">
+  <Description>A rule used by a Workflow to determine a step action or variable value.
+
+Note that an Attributes map of all variables from the current WorkflowContext, merged with the arguments from the Step, is also passed into the workflow rule.</Description>
+  <Signature returnType="Object"/>
+  <Source>import sailpoint.object.*;
+		import sailpoint.server.Auditor;
+		Identity identity=context.getObjectByName(Identity.class, identityName);
+		String action = "TerminationSubmitted";
+		if (Auditor.isEnabled(action))
+		{
+			AuditEvent event = new AuditEvent("message", action);
+			event.setTarget(identityName);
+			event.setApplication("IIQ");
+			event.setSource(launcher);
+			event.setAction(action);
+			event.setString1("TerminationSubmitted");
+			event.setAttribute("empId",identity.getAttribute("empId"));
+			event.setAttribute("displayName",identity.getAttribute("displayName"));
+			event.setAttribute("Manager",identity.getAttribute("manager"));
+			event.setAttribute("email",identity.getAttribute("email"));
+			event.setAttribute("location",identity.getAttribute("location"));
+			event.setAttribute("department",identity.getAttribute("department"));
+			event.setAttribute("jobTitle",identity.getAttribute("jobTitle"));
+			event.setAttribute("status",identity.getAttribute("status"));
+			event.setAttribute("leaverDate",identity.getAttribute("leaverDate"));
+			Auditor.log(event);
+			context.commitTransaction();
+		}</Source>
+</Rule>

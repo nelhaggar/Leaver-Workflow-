@@ -1,0 +1,87 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE Workflow PUBLIC "sailpoint.dtd" "sailpoint.dtd">
+<Workflow created="1592590094358" explicitTransitions="true" id="ff80808172ccf2d90172cdc450160072" modified="1594821367406" name="Schedule Termination" type="IdentityLifecycle">
+  <Variable input="true" name="launcher"/>
+  <Variable initializer="rule:Requester_Type" input="true" name="requesterType"/>
+  <Variable input="true" name="leaverDate"/>
+  <Variable name="trigger">
+    <Description>The IdentityTrigger</Description>
+  </Variable>
+  <Variable initializer="false" name="transient"/>
+  <Variable input="true" name="identityName">
+    <Description>The name of the identity.</Description>
+  </Variable>
+  <Variable initializer="spadmin" input="true" name="fallbackApprover">
+    <Description>A String that specifies the name of the Identity that will 
+      be assigned any approvals where the owner of the approver 
+      can&amp;#39;t be resolved. Example if the scheme is &amp;quot;owner&amp;quot; and the 
+      application doesn&amp;#39;t specify and owner.</Description>
+  </Variable>
+  <Variable initializer="LCM" input="true" name="source">
+    <Description>String version of sailpoint.object.Source to indicate
+      where the request originated.  Defaults to LCM.</Description>
+  </Variable>
+  <Variable initializer="true" input="true" name="trace">
+    <Description>Used for debugging this workflow and when set to true trace
+      will be sent to stdout.</Description>
+  </Variable>
+  <Variable initializer="Normal" input="true" name="workItemPriority">
+    <Description>The String version of a WorkItem.Priority. This variable is 
+       used to set the priority on all of the workitems generated 
+       as part of this workflow and also set on the IdentityRequest
+       object.</Description>
+  </Variable>
+  <Description>Disable all accounts when an employee leaves the company.</Description>
+  <RuleLibraries>
+    <Reference class="sailpoint.object.Rule" id="ff808081618fc50001618fc52fb00191" name="LCM Workflow Library"/>
+  </RuleLibraries>
+  <Step icon="Start" name="Start" posX="33" posY="20">
+    <Transition to="Select Identity to Terminate"/>
+  </Step>
+  <Step icon="Default" name="Select Identity to Terminate" posX="90" posY="159">
+    <Approval name="Schedule Termination - Select Identity" owner="ref:launcher" return="launcher,identityName,exitWorkflow" send="launcher">
+      <Arg name="workItemType" value="Form"/>
+      <Arg name="requesterType" value="ref:requesterType"/>
+      <Form name="Schedule Termination - Select Identity">
+        <Attributes>
+          <Map>
+            <entry key="pageTitle" value="Schedule Termination - Select Identity"/>
+          </Map>
+        </Attributes>
+        <FormRef id="ff80808172be8cfb0172c266209500c2" name="Schedule Termination - Select Identity"/>
+      </Form>
+    </Approval>
+    <Transition to="Stop" when="exitWorkflow"/>
+    <Transition to="Get Identity Details"/>
+  </Step>
+  <Step action="getIdentityModel" icon="Default" name="Get Identity Details" posX="177" posY="20" resultVariable="identityModel">
+    <Arg name="expandIdentity" value="fasle"/>
+    <Transition to="Calculate Termination Details"/>
+  </Step>
+  <Step action="rule:IdentyModel_with_entitlments" icon="Default" name="Calculate Termination Details" posX="326" posY="20" resultVariable="identityModel">
+    <Transition to="Confirm Termination"/>
+  </Step>
+  <Step icon="Default" name="Confirm Termination" posX="495" posY="21">
+    <Approval name="Schedule Termination - Confirm" owner="ref:launcher" return="identityModel,exitWorkflow,leaverDate" send="identityModel">
+      <Arg name="workItemType" value="Form"/>
+      <Arg name="workItemFormBasePath" value="identityModel"/>
+      <Form name="Schedule Termination - Confirm">
+        <Attributes>
+          <Map>
+            <entry key="pageTitle" value="Schedule Termination - Confirm"/>
+          </Map>
+        </Attributes>
+        <FormRef id="ff80808173016c960173018b9b2e003b" name="Schedule Termination - Confirm"/>
+      </Form>
+    </Approval>
+    <Transition to="Stop" when="exitWorkflow"/>
+    <Transition to="Audit Scheduled Termination"/>
+  </Step>
+  <Step action="rule:Audit_all_Identity_Attributes" icon="Default" name="Audit Scheduled Termination" posX="627" posY="21">
+    <Transition to="Set Leaver Date"/>
+  </Step>
+  <Step action="rule:Disable_identity" icon="Default" name="Set Leaver Date" posX="756" posY="21">
+    <Transition to="Stop"/>
+  </Step>
+  <Step icon="Stop" name="Stop" posX="756" posY="187"/>
+</Workflow>
